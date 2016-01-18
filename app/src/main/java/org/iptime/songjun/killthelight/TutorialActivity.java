@@ -20,7 +20,7 @@ public class TutorialActivity extends Activity {
         hd.postDelayed(new Runnable() {
             @Override
             public void run() {
-                startActivity(new Intent(getApplicationContext(), DeviceListActivity.class));
+//                startActivity(new Intent(getApplicationContext(), DeviceListActivity.class));
             }
         }, 3000);
 

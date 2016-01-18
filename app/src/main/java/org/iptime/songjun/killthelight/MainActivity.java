@@ -1,90 +1,129 @@
 package org.iptime.songjun.killthelight;
 
 import android.app.ActionBar;
+import android.app.Activity;
+import android.appwidget.AppWidgetManager;
+import android.bluetooth.BluetoothAdapter;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.Toast;
+
+import app.akexorcist.bluetotohspp.library.BluetoothSPP;
+import app.akexorcist.bluetotohspp.library.BluetoothState;
+import app.akexorcist.bluetotohspp.library.DeviceList;
 
 
 public class MainActivity extends AppCompatActivity {
+    BluetoothSPP bt;
+    ImageView im;
+    String receive;
+    int mAppWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
 
-    // Declaring Your View and Variables
-
-    Toolbar toolbar;
-    ViewPager pager;
-    ViewPagerAdapter adapter;
-    SlidingTabLayout tabs;
-    CharSequence Titles[] = {"Home", "Time"};
-    int Numboftabs = 2;
-
-    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        SharedPre sharedPre = new SharedPre(getApplicationContext(), "KillTheLight");
-        if(sharedPre.get("isFirst", true)){
-//            setFirst();
-        }
+        im = (ImageView) findViewById(R.id.img_onoff);
 
-//        ActionBar actionBar = getActionBar();
-//       actionBar.hide();
-        // Creating The Toolbar and setting it as the Toolbar for the activity
-
-        toolbar = (Toolbar) findViewById(R.id.tool_bar);
-        setSupportActionBar(toolbar);
-
-
-        adapter = new ViewPagerAdapter(getSupportFragmentManager(), Titles, Numboftabs);
-
-        pager = (ViewPager) findViewById(R.id.pager);
-        pager.setAdapter(adapter);
-
-        tabs = (SlidingTabLayout) findViewById(R.id.tabs);
-        tabs.setDistributeEvenly(true); // To make the Tabs Fixed set this true, This makes the tabs Space Evenly in Available width
-
-        tabs.setCustomTabColorizer(new SlidingTabLayout.TabColorizer() {
+        im.setOnClickListener(new View.OnClickListener() {
             @Override
-            public int getIndicatorColor(int position) {
-                return getResources().getColor(R.color.tabsScrollColor);
+            public void onClick(View v) {
+                bt.send("n",true);
             }
         });
 
-//        tabs.setViewPager(pager);
+        bt=new BluetoothSPP(this);
+
+            if(!bt.isBluetoothAvailable())
+
+            {
+                Toast.makeText(getApplicationContext()
+                        , "블루투스를 켜주세요"
+                        , Toast.LENGTH_SHORT).show();
+                finish();
+            }
+
+            bt.setBluetoothConnectionListener(new BluetoothSPP.BluetoothConnectionListener()
+
+            {
+                public void onDeviceConnected(String name, String address) {
+                    Toast.makeText(getApplicationContext()
+                            , "연결되었습니다", Toast.LENGTH_SHORT).show();
+                }
+
+                public void onDeviceDisconnected() {
+                    Toast.makeText(getApplicationContext()
+                            , "연결이끊겼습니다"
+                            , Toast.LENGTH_SHORT).show();
+                }
+
+                public void onDeviceConnectionFailed() {
+                }
+            });
+
+        bt.setAutoConnectionListener(new BluetoothSPP.AutoConnectionListener() {
+            public void onNewConnection(String name, String address) {
+            }
+
+            public void onAutoConnectionStarted() {
+            }
+        });
+        bt.setOnDataReceivedListener(new BluetoothSPP.OnDataReceivedListener() {
+            public void onDataReceived(byte[] data, String message) {
+                receive = message;
+                if (receive.equals("to=true"))
+                    im.setImageResource(R.drawable.off);
+                else if (receive.equals("to=false"))
+                    im.setImageResource(R.drawable.on);
+
+            }
+        });
 
     }
 
-//    private void setFirst() {
-//        startActivity(new Intent(getApplicationContext(), TutorialActivity.class));
-//
-//    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
+    public void onDestroy() {
+        super.onDestroy();
+        bt.stopService();
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.set) {
-
-            Intent intent=new Intent (getApplicationContext(), AutoConnectActivity.class);
-            startActivity(intent);
-
-            return true;
+    public void onStart() {
+        super.onStart();
+        if (!bt.isBluetoothEnabled()) {
+            bt.enable();
+        } else {
+            if (!bt.isServiceAvailable()) {
+                bt.setupService();
+                bt.startService(BluetoothState.DEVICE_OTHER);
+                setup();
+            }
         }
+    }
 
-        return super.onOptionsItemSelected(item);
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == BluetoothState.REQUEST_CONNECT_DEVICE) {
+            if (resultCode == Activity.RESULT_OK)
+                bt.connect(data);
+        } else if (requestCode == BluetoothState.REQUEST_ENABLE_BT) {
+            if (resultCode == Activity.RESULT_OK) {
+                bt.setupService();
+            } else {
+                Toast.makeText(getApplicationContext()
+                        , "블루투스 켜주세요"
+                        , Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        }
+    }
+
+    public void setup() {
+        bt.autoConnect("HC-06");
     }
 }
